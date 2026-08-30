@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Brown Player</title>
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon.png">
+  
+  <!-- jsmediatags CDN for reading ID3 tags -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+  
+  <style>
+    :root {
+      --bg-dark: #2D1A12;      /* 深いローストブラウン */
+      --bg-panel: #3E2723;     /* ココアブラウン */
+      --text-main: #EFEBE9;    /* ミルキーベージュ */
+      --text-sub: #BCAAA4;     /* ライトブラウン */
+      --accent: #8D6E63;       /* キャラメルブラウン */
+      --accent-light: #D7CCC8; /* クリーミーベージュ */
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding-top: var(--safe-top);
+    }
+
+    /* 歌詞表示エリア（画面上部） */
+    #lyrics-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      text-align: center;
+      scroll-behavior: smooth;
+    }
+
+    #lyrics-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    #lyrics-container::-webkit-scrollbar-thumb {
+      background-color: var(--accent);
+      border-radius: 2px;
+    }
+
+    #lyrics-placeholder {
+      margin: auto;
+      color: var(--text-sub);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #lyrics-placeholder .music-icon {
+      font-size: 48px;
+      opacity: 0.5;
+    }
+
+    #lyrics-text {
+      width: 100%;
+      font-size: 1.25rem;
+      line-height: 2.2rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-weight: 500;
+      color: var(--text-main);
+      padding-bottom: 40px;
+    }
+
+    /* コントロールエリア（画面下部） */
+    #control-panel {
+      background-color: var(--bg-panel);
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
+      padding: 20px 20px calc(20px + var(--safe-bottom)) 20px;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 曲情報表示 */
+    #track-info {
+      text-align: center;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    #track-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--text-main);
+      margin-bottom: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #track-artist-folder {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* アルバムアート ＆ 再生コントロール（横並び） */
+    #media-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    #album-art-container {
+      width: 80px;
+      height: 80px;
+      background-color: var(--bg-dark);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    #album-art {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .default-art {
+      color: var(--accent);
+      font-size: 32px;
+    }
+
+    .control-btn {
+      background: none;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background-color 0.2s, transform 0.1s;
+      outline: none;
+    }
+
+    .control-btn:active {
+      transform: scale(0.92);
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-nav {
+      width: 48px;
+      height: 48px;
+      font-size: 24px;
+    }
+
+    .btn-play-pause {
+      width: 64px;
+      height: 64px;
+      background-color: var(--accent);
+      font-size: 28px;
+      box-shadow: 0 4px 12px rgba(141, 110, 99, 0.4);
+    }
+
+    .btn-play-pause:active {
+      background-color: var(--accent-light);
+      color: var(--bg-dark);
+    }
+
+    /* シークバーエリア */
+    #seekbar-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* カスタムスライダーの共通設定 */
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--bg-dark);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-light);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+      transition: transform 0.1s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.3);
+    }
+
+    /* 下部サブコントロール（フォルダ選択、速度選択、音量スライダー） */
+    #sub-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 12px;
+    }
+
+    .folder-select-wrapper {
+      position: relative;
+      flex: 1.2;
+    }
+
+    .speed-select-wrapper {
+      position: relative;
+      width: 72px;
+    }
+
+    /* セレクトボックスのカスタムデザイン */
+    #folder-select, #speed-select {
+      width: 100%;
+      background-color: var(--bg-dark);
+      border: 1px solid var(--accent);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    #speed-select {
+      padding: 8px 20px 8px 8px;
+      text-align: center;
+    }
+
+    .folder-select-wrapper::after {
+      content: '▼';
+      font-size: 10px;
+      color: var(--text-sub);
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .speed-select-wrapper::after {
+      content: '▼';
+      font-size: 8px;
+      color: var(--text-sub);
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .volume-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100px;
+    }
+
+    .volume-icon {
+      font-size: 18px;
+      color: var(--text-sub);
+      cursor: pointer;
+    }
+
+    #volume-slider {
+      flex: 1;
+      height: 4px;
+    }
+
+    #volume-slider::-webkit-slider-thumb {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* フォルダ読込用隠しインプットとボタン */
+    #setup-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      z-index: 10;
+      text-align: center;
+      gap: 20px;
+    }
+
+    .setup-title {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--text-main);
+    }
+
+    .setup-desc {
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: var(--text-main);
+      border: none;
+      padding: 14px 28px;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(141, 110, 99, 0.4);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary:active {
+      background-color: var(--accent-light);
+      color: var(--bg-dark);
+    }
+
+    .info-badge {
+      background-color: rgba(255,255,255,0.05);
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      border: 1px dashed var(--accent);
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 初回フォルダー読み込み画面 -->
+  <div id="setup-screen">
+    <div style="font-size: 64px;">☕</div>
+    <div class="setup-title">Brown Player</div>
+    <p class="setup-desc">
+      音楽ファイル（MP3）が含まれるフォルダを選択してください。<br>
+      フォルダ単位で自動的に整理して再生します。
+    </p>
+    <button class="btn-primary" onclick="triggerFolderSelect()">
+      📁 フォルダを選択
+    </button>
+    <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;" onchange="handleFiles(this.files)">
+    
+    <div class="info-badge">
+      ※ 端末内の「Music」やSDカード内のフォルダを指定できます。<br>
+      ※ 読み取られた音楽データがネット上に送信されることはありません。
+    </div>
+  </div>
+
+  <!-- メインプレイヤー画面 -->
+  <!-- 画面上部：歌詞表示エリア -->
+  <div id="lyrics-container">
+    <div id="lyrics-placeholder">
+      <span class="music-icon">🎵</span>
+      <span id="placeholder-text">再生ボタンを押してください</span>
+    </div>
+    <div id="lyrics-text" style="display: none;"></div>
+  </div>
+
+  <!-- 画面下部：コントロールパネル -->
+  <div id="control-panel">
+    
+    <!-- 曲名・フォルダ情報 -->
+    <div id="track-info">
+      <div id="track-title">曲が選択されていません</div>
+      <div id="track-artist-folder">-</div>
+    </div>
+
+    <!-- アルバムアートとメイン操作ボタン（横並び） -->
+    <div id="media-row">
+      <button class="control-btn btn-nav" onclick="playPrev()" aria-label="前の曲">⏮️</button>
+      
+      <div id="album-art-container">
+        <div id="default-art" class="default-art">💿</div>
+        <img id="album-art" src="" alt="Album Art" style="display: none;">
+      </div>
+      
+      <button id="play-btn" class="control-btn btn-play-pause" onclick="togglePlay()" aria-label="再生">▶️</button>
+      <button class="control-btn btn-nav" onclick="playNext()" aria-label="次の曲">⏭️</button>
+    </div>
+
+    <!-- シークバー -->
+    <div id="seekbar-container">
+      <input type="range" id="seekbar" value="0" min="0" max="100" oninput="seekTrack(this.value)">
+      <div class="time-row">
+        <span id="time-current">0:00</span>
+        <span id="time-duration">0:00</span>
+      </div>
+    </div>
+
+    <!-- サブコントロール（フォルダ選択、再生速度、音量） -->
+    <div id="sub-controls">
+      <!-- フォルダ選択セレクトボックス -->
+      <div class="folder-select-wrapper">
+        <select id="folder-select" onchange="switchFolder(this.value)" aria-label="フォルダ選択">
+          <option value="">フォルダがありません</option>
+        </select>
+      </div>
+
+      <!-- 再生速度選択 -->
+      <div class="speed-select-wrapper">
+        <select id="speed-select" onchange="changeSpeed(this.value)" aria-label="再生速度">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="0.9">0.9x</option>
+          <option value="1.0" selected>1.0x</option>
+          <option value="1.1">1.1x</option>
+          <option value="1.2">1.2x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="1.75">1.75x</option>
+          <option value="2.0">2.0x</option>
+        </select>
+      </div>
+
+      <!-- 音量スライダー（音量0で停止） -->
+      <div class="volume-container">
+        <span id="volume-btn" class="volume-icon" onclick="toggleMute()">🔊</span>
+        <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="changeVolume(this.value)">
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 音声オブジェクト（画面外） -->
+  <audio id="audio-player"></audio>
+
+  <script>
+    // グローバル状態管理
+    let allFiles = [];        // すべての音楽ファイルオブジェクト
+    let folders = {};         // フォルダごとのファイルリスト: { folderName: [file1, file2, ...] }
+    let currentFolderName = "";
+    let currentPlaylist = []; // 現在再生対象 of フォルダ内ファイルリスト
+    let currentIndex = -1;
+    let isMuted = false;
+    let savedVolume = 0.8;    // ミュート解除用の音量保持
+    let currentSpeed = 1.0;   // 再生速度保持用
+
+    const audio = document.getElementById('audio-player');
+    const playBtn = document.getElementById('play-btn');
+    const seekbar = document.getElementById('seekbar');
+    const timeCurrent = document.getElementById('time-current');
+    const timeDuration = document.getElementById('time-duration');
+    const trackTitle = document.getElementById('track-title');
+    const trackArtistFolder = document.getElementById('track-artist-folder');
+    const albumArt = document.getElementById('album-art');
+    const defaultArt = document.getElementById('default-art');
+    const lyricsContainer = document.getElementById('lyrics-container');
+    const lyricsPlaceholder = document.getElementById('lyrics-placeholder');
+    const placeholderText = document.getElementById('placeholder-text');
+    const lyricsText = document.getElementById('lyrics-text');
+    const folderSelect = document.getElementById('folder-select');
+    const speedSelect = document.getElementById('speed-select');
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeBtn = document.getElementById('volume-btn');
+
+    // サービスワーカー登録
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('Service Worker registered', reg))
+          .catch(err => console.error('Service Worker registration failed', err));
+      });
+    }
+
+    // 隠しフォルダインプットのトリガー
+    function triggerFolderSelect() {
+      document.getElementById('folder-input').click();
+    }
+
+    // 選択されたフォルダ内のファイルを処理
+    function handleFiles(files) {
+      if (files.length === 0) return;
+
+      allFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.mp3'));
+      if (allFiles.length === 0) {
+        alert('指定したフォルダにMP3ファイルが見つかりませんでした。');
+        return;
+      }
+
+      folders = {};
+      allFiles.forEach(file => {
+        const pathParts = file.webkitRelativePath.split('/');
+        let folderName = '不明なフォルダ';
+        if (pathParts.length > 1) {
+          folderName = pathParts[pathParts.length - 2];
+        }
+        
+        if (!folders[folderName]) {
+          folders[folderName] = [];
+        }
+        folders[folderName].push(file);
+      });
+
+      // フォルダリストを並び替えてドロップダウンを生成
+      folderSelect.innerHTML = '';
+      const sortedFolderNames = Object.keys(folders).sort();
+      sortedFolderNames.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = `📁 ${name} (${folders[name].length}曲)`;
+        folderSelect.appendChild(option);
+      });
+
+      // 初期フォルダを設定
+      currentFolderName = sortedFolderNames[0];
+      folderSelect.value = currentFolderName;
+      currentPlaylist = folders[currentFolderName];
+      
+      // 曲順をソート（ファイル名順）
+      currentPlaylist.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+
+      // セットアップ画面を非表示にする
+      document.getElementById('setup-screen').style.display = 'none';
+
+      // 最初の曲を選択状態にする
+      selectTrack(0, false);
+      placeholderText.textContent = "曲を選択して再生してください";
+    }
+
+    // フォルダの切り替え
+    function switchFolder(folderName) {
+      if (!folderName || !folders[folderName]) return;
+      currentFolderName = folderName;
+      currentPlaylist = folders[folderName];
+      currentPlaylist.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+      selectTrack(0, true);
+    }
+
+    // 曲の選択
+    function selectTrack(index, autoPlay = true) {
+      if (index < 0 || index >= currentPlaylist.length) return;
+      currentIndex = index;
+      const file = currentPlaylist[currentIndex];
+
+      // 曲情報更新
+      trackTitle.textContent = file.name.replace(/\.[^/.]+$/, ""); // 拡張子削除
+      trackArtistFolder.textContent = `フォルダ: ${currentFolderName}`;
+
+      // 音源ソース設定
+      const fileURL = URL.createObjectURL(file);
+      audio.src = fileURL;
+
+      // 歌詞とアートワークの初期化＆読み込み
+      resetMediaInfo();
+      readTags(file);
+
+      if (autoPlay) {
+        audio.play().then(() => {
+          updatePlayButton(true);
+          audio.playbackRate = currentSpeed; // 再生速度を再適用
+        }).catch(err => {
+          console.log("Auto-play blocked or failed", err);
+          updatePlayButton(false);
+        });
+      } else {
+        updatePlayButton(false);
+      }
+    }
+
+    // 再生・一時停止のトグル
+    function togglePlay() {
+      if (currentIndex === -1) {
+        if (currentPlaylist.length > 0) {
+          selectTrack(0, true);
+        }
+        return;
+      }
+
+      if (audio.paused) {
+        if (audio.volume === 0) {
+          audio.volume = 0.1;
+          volumeSlider.value = 10;
+          updateVolumeIcon(0.1);
+        }
+        audio.play().then(() => {
+          updatePlayButton(true);
+          audio.playbackRate = currentSpeed; // 再生速度を再適用
+        }).catch(err => console.error(err));
+      } else {
+        audio.pause();
+        updatePlayButton(false);
+      }
+    }
+
+    function updatePlayButton(isPlaying) {
+      playBtn.textContent = isPlaying ? "⏸️" : "▶️";
+      playBtn.setAttribute("aria-label", isPlaying ? "一時停止" : "再生");
+    }
+
+    // 前の曲へ
+    function playPrev() {
+      if (currentPlaylist.length === 0) return;
+      let newIndex = currentIndex - 1;
+      if (newIndex < 0) {
+        newIndex = currentPlaylist.length - 1;
+      }
+      selectTrack(newIndex, true);
+    }
+
+    // 次の曲へ
+    function playNext() {
+      if (currentPlaylist.length === 0) return;
+      let newIndex = currentIndex + 1;
+      if (newIndex >= currentPlaylist.length) {
+        newIndex = 0;
+      }
+      selectTrack(newIndex, true);
+    }
+
+    // ID3タグ（歌詞・アルバムアート）の解析
+    function readTags(file) {
+      window.jsmediatags.read(file, {
+        onSuccess: function(tag) {
+          const tags = tag.tags;
+
+          // 1. 歌詞の表示
+          let lyrics = "";
+          if (tags.USLT) {
+            lyrics = tags.USLT.data ? tags.USLT.data.lyrics : tags.USLT;
+          } else if (tags.SYLT) {
+            lyrics = "[同期歌詞がタグに含まれています]\n" + 
+                     (tags.SYLT.data ? tags.SYLT.data.map(item => item.text).join('\n') : "");
+          } else if (tags.comment) {
+            const commText = tags.comment.data ? tags.comment.data.text : tags.comment;
+            if (commText && commText.length > 50) {
+              lyrics = commText;
+            }
+          }
+
+          if (lyrics && lyrics.trim() !== "") {
+            lyricsPlaceholder.style.display = 'none';
+            lyricsText.style.display = 'block';
+            lyricsText.textContent = lyrics;
+            lyricsContainer.scrollTop = 0;
+          } else {
+            showNoLyricsInfo(tags.title, tags.artist, tags.album);
+          }
+
+          // 2. カバーアート（アルバムアート）の表示
+          if (tags.picture) {
+            const { data, format } = tags.picture;
+            const byteArray = new Uint8Array(data);
+            const blob = new Blob([byteArray], { type: format });
+            const artUrl = URL.createObjectURL(blob);
+            
+            albumArt.src = artUrl;
+            albumArt.style.display = 'block';
+            defaultArt.style.display = 'none';
+          } else {
+            showDefaultArt();
+          }
+        },
+        onError: function(error) {
+          console.log("ID3タグの読み込み失敗:", error);
+          showNoLyricsInfo();
+          showDefaultArt();
+        }
+      });
+    }
+
+    function showNoLyricsInfo(title = "", artist = "", album = "") {
+      lyricsText.style.display = 'none';
+      lyricsPlaceholder.style.display = 'flex';
+      
+      const t = title || trackTitle.textContent;
+      const a = artist || "アーティスト名不明";
+      const al = album || "アルバム名不明";
+
+      placeholderText.innerHTML = `
+        <span style="font-size: 1.1rem; font-weight: bold; color: var(--text-main);">${t}</span><br>
+        <span style="font-size: 0.9rem; color: var(--text-sub);">${a}</span><br>
+        <span style="font-size: 0.8rem; color: var(--accent); margin-top: 4px; display:inline-block;">— 歌詞データはありません —</span>
+      `;
+    }
+
+    function showDefaultArt() {
+      albumArt.src = "";
+      albumArt.style.display = 'none';
+      defaultArt.style.display = 'block';
+    }
+
+    function resetMediaInfo() {
+      lyricsText.style.display = 'none';
+      lyricsPlaceholder.style.display = 'flex';
+      placeholderText.textContent = "タグ情報・歌詞を読み込み中...";
+      showDefaultArt();
+    }
+
+    // シークバーの制御
+    function seekTrack(value) {
+      if (!audio.duration) return;
+      const seekTo = (value / 100) * audio.duration;
+      audio.currentTime = seekTo;
+    }
+
+    // 再生速度制御
+    function changeSpeed(value) {
+      currentSpeed = parseFloat(value);
+      audio.playbackRate = currentSpeed;
+    }
+
+    // 音量制御
+    function changeVolume(value) {
+      const vol = value / 100;
+      audio.volume = vol;
+      updateVolumeIcon(vol);
+      
+      if (vol === 0) {
+        audio.pause();
+        updatePlayButton(false);
+      }
+    }
+
+    function updateVolumeIcon(vol) {
+      if (vol === 0 || audio.muted) {
+        volumeBtn.textContent = "🔇";
+      } else if (vol < 0.3) {
+        volumeBtn.textContent = "🔈";
+      } else if (vol < 0.7) {
+        volumeBtn.textContent = "🔉";
+      } else {
+        volumeBtn.textContent = "🔊";
+      }
+    }
+
+    // 音量のミュート／解除
+    function toggleMute() {
+      if (audio.muted || audio.volume === 0) {
+        audio.muted = false;
+        const targetVol = savedVolume > 0 ? savedVolume : 0.8;
+        audio.volume = targetVol;
+        volumeSlider.value = targetVol * 100;
+        updateVolumeIcon(targetVol);
+      } else {
+        savedVolume = audio.volume;
+        audio.volume = 0;
+        volumeSlider.value = 0;
+        updateVolumeIcon(0);
+        audio.pause();
+        updatePlayButton(false);
+      }
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return "0:00";
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    // --- オーディオプレーヤーの各種イベントリスナー ---
+
+    // 時間更新時
+    audio.addEventListener('timeupdate', () => {
+      if (!audio.duration) return;
+      const progress = (audio.currentTime / audio.duration) * 100;
+      seekbar.value = progress;
+      timeCurrent.textContent = formatTime(audio.currentTime);
+    });
+
+    // 曲の長さ確定時
+    audio.addEventListener('loadedmetadata', () => {
+      timeDuration.textContent = formatTime(audio.duration);
+      seekbar.value = 0;
+      audio.playbackRate = currentSpeed; // ロード時に再生速度を再適用
+    });
+
+    // 曲再生終了時
+    audio.addEventListener('ended', () => {
+      playNext();
+    });
+
+    // 音量変更時
+    audio.addEventListener('volumechange', () => {
+      volumeSlider.value = audio.volume * 100;
+      updateVolumeIcon(audio.volume);
+
+      if (audio.volume === 0 || audio.muted) {
+        audio.pause();
+        updatePlayButton(false);
+      }
+    });
+
+    // キーボード操作対応
+    document.addEventListener('keydown', (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      }
+    });
+  </script>
+</body>
+</html>
