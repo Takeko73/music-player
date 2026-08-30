@@ -38,6 +38,7 @@
       background-color: var(--bg-dark);
       color: var(--text-main);
       height: 100vh;
+      height: 100dvh;          /* モバイルブラウザのアドレスバー・下部バー対策 */
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -107,11 +108,12 @@
       background-color: var(--bg-panel);
       border-top-left-radius: 28px;
       border-top-right-radius: 28px;
-      padding: 20px 20px calc(20px + var(--safe-bottom)) 20px;
+      /* 下部のナビゲーションバー（ホームインジケーター）との重なりを防ぐために余白を拡張 */
+      padding: 20px 20px calc(32px + var(--safe-bottom)) 20px;
       box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 8px;
       z-index: 5;
     }
 
@@ -436,7 +438,6 @@
     </div>
 
     <!-- アルバムアートとメイン操作ボタン（横並び） -->
-    <!-- 順序：アルバムアート、前の曲、再生、次の曲 -->
     <div id="media-row">
       <div id="album-art-container">
         <div id="default-art" class="default-art">💿</div>
@@ -683,7 +684,6 @@
     function parseLrc(text) {
       parsedLyrics = [];
       const lines = text.split(/\r?\n/);
-      // 時間タグ [mm:ss.xx] または [mm:ss] にマッチする正規表現
       const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/g;
       let hasTimeTags = false;
 
@@ -691,13 +691,11 @@
         const matches = [...line.matchAll(timeRegex)];
         if (matches.length > 0) {
           hasTimeTags = true;
-          // 時間タグを取り除いた純粋な歌詞部分
           const lyricText = line.replace(timeRegex, '').trim();
           
           matches.forEach(match => {
             const min = parseInt(match[1], 10);
             const sec = parseInt(match[2], 10);
-            // ミリ秒または百分の1秒の処理
             let ms = 0;
             if (match[3]) {
               ms = parseFloat("0." + match[3]);
@@ -712,7 +710,6 @@
         }
       });
 
-      // 再生時間順に並び替え
       parsedLyrics.sort((a, b) => a.time - b.time);
       return hasTimeTags;
     }
@@ -726,22 +723,19 @@
       const isLrc = parseLrc(text);
 
       if (isLrc && parsedLyrics.length > 0) {
-        // 同期歌詞の場合：各行を別要素で生成し、不透明度を調整可能にする
         parsedLyrics.forEach((line, index) => {
           const p = document.createElement('p');
           p.className = 'lyric-line';
           p.id = `lyric-line-${index}`;
-          // 空行でも高さを保つため、空の場合は全角スペースを補う
           p.textContent = line.text || "　";
           lyricsText.appendChild(p);
         });
       } else {
-        // 非同期（普通のテキスト）歌詞の場合
         parsedLyrics = [];
         const lines = text.split(/\r?\n/);
         lines.forEach(line => {
           const p = document.createElement('p');
-          p.className = 'lyric-line active'; // 常時明るく表示
+          p.className = 'lyric-line active';
           p.style.opacity = '1.0';
           p.textContent = line || "　";
           lyricsText.appendChild(p);
@@ -892,13 +886,13 @@
 
     // --- オーディオプレーヤーの各種イベントリスナー ---
 
-    // 時間更新時（シークバー更新 ＆ 歌詞スクロール）
+    // 時間更新時
     audio.addEventListener('timeupdate', () => {
       if (!audio.duration) return;
       
       const curTime = audio.currentTime;
 
-      // 1. シークバーと現在時間の更新
+      // 1. シークバーと時間表示の更新
       const progress = (curTime / audio.duration) * 100;
       seekbar.value = progress;
       timeCurrent.textContent = formatTime(curTime);
@@ -907,7 +901,6 @@
       if (parsedLyrics.length > 0) {
         let activeIndex = -1;
 
-        // 現在時間以下の最大の時間タグを持つ歌詞行を探す
         for (let i = 0; i < parsedLyrics.length; i++) {
           if (parsedLyrics[i].time <= curTime) {
             activeIndex = i;
@@ -916,23 +909,18 @@
           }
         }
 
-        // アクティブ行が切り替わった場合のみDOM操作を行う
         if (activeIndex !== -1 && activeIndex !== lastActiveIndex) {
-          // 前のアクティブクラスを除去
           const oldActive = document.querySelector('.lyric-line.active');
           if (oldActive) oldActive.classList.remove('active');
 
-          // 新しい行にアクティブクラスを追加
           const newActive = document.getElementById(`lyric-line-${activeIndex}`);
           if (newActive) {
             newActive.classList.add('active');
 
-            // 歌詞表示エリア中央へのスクロール位置計算
             const containerHeight = lyricsContainer.clientHeight;
             const lineOffsetTop = newActive.offsetTop;
             const lineClientHeight = newActive.clientHeight;
 
-            // スクロール位置を中央に設定
             lyricsContainer.scrollTop = lineOffsetTop - (containerHeight / 2) + (lineClientHeight / 2);
           }
           lastActiveIndex = activeIndex;
