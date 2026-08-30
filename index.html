@@ -48,7 +48,7 @@
     #lyrics-container {
       flex: 1;
       overflow-y: auto;
-      padding: 20px 24px;
+      padding: 40vh 24px; /* 上下に余白を作って、アクティブ行が中央に来やすくする */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -66,7 +66,7 @@
     }
 
     #lyrics-placeholder {
-      margin: auto;
+      margin: auto 0;
       color: var(--text-sub);
       display: flex;
       flex-direction: column;
@@ -81,13 +81,25 @@
 
     #lyrics-text {
       width: 100%;
-      font-size: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .lyric-line {
+      font-size: 1.2rem;
       line-height: 2.2rem;
-      white-space: pre-wrap;
+      color: rgba(239, 235, 233, 0.35); /* 非アクティブ行は薄く表示 */
+      padding: 8px 0;
+      transition: color 0.4s ease, font-size 0.4s ease, font-weight 0.4s ease;
+      width: 100%;
       word-wrap: break-word;
-      font-weight: 500;
-      color: var(--text-main);
-      padding-bottom: 40px;
+    }
+
+    .lyric-line.active {
+      color: var(--text-main); /* アクティブ行はクッキリ */
+      font-size: 1.45rem;
+      font-weight: bold;
     }
 
     /* コントロールエリア（画面下部） */
@@ -100,6 +112,7 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+      z-index: 5;
     }
 
     /* 曲情報表示 */
@@ -423,14 +436,14 @@
     </div>
 
     <!-- アルバムアートとメイン操作ボタン（横並び） -->
+    <!-- 順序：アルバムアート、前の曲、再生、次の曲 -->
     <div id="media-row">
-      <button class="control-btn btn-nav" onclick="playPrev()" aria-label="前の曲">⏮️</button>
-      
       <div id="album-art-container">
         <div id="default-art" class="default-art">💿</div>
         <img id="album-art" src="" alt="Album Art" style="display: none;">
       </div>
-      
+
+      <button class="control-btn btn-nav" onclick="playPrev()" aria-label="前の曲">⏮️</button>
       <button id="play-btn" class="control-btn btn-play-pause" onclick="togglePlay()" aria-label="再生">▶️</button>
       <button class="control-btn btn-nav" onclick="playNext()" aria-label="次の曲">⏭️</button>
     </div>
@@ -486,11 +499,13 @@
     let allFiles = [];        // すべての音楽ファイルオブジェクト
     let folders = {};         // フォルダごとのファイルリスト: { folderName: [file1, file2, ...] }
     let currentFolderName = "";
-    let currentPlaylist = []; // 現在再生対象 of フォルダ内ファイルリスト
+    let currentPlaylist = []; // 現在再生対象のフォルダ内ファイルリスト
     let currentIndex = -1;
     let isMuted = false;
     let savedVolume = 0.8;    // ミュート解除用の音量保持
     let currentSpeed = 1.0;   // 再生速度保持用
+    let parsedLyrics = [];    // 解析済み同期歌詞の配列: [{ time: 秒数, text: 行テキスト }]
+    let lastActiveIndex = -1; // 前回アクティブだった歌詞のインデックス
 
     const audio = document.getElementById('audio-player');
     const playBtn = document.getElementById('play-btn');
@@ -664,6 +679,77 @@
       selectTrack(newIndex, true);
     }
 
+    // LRC（同期歌詞）フォーマットの解析
+    function parseLrc(text) {
+      parsedLyrics = [];
+      const lines = text.split(/\r?\n/);
+      // 時間タグ [mm:ss.xx] または [mm:ss] にマッチする正規表現
+      const timeRegex = /\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]/g;
+      let hasTimeTags = false;
+
+      lines.forEach(line => {
+        const matches = [...line.matchAll(timeRegex)];
+        if (matches.length > 0) {
+          hasTimeTags = true;
+          // 時間タグを取り除いた純粋な歌詞部分
+          const lyricText = line.replace(timeRegex, '').trim();
+          
+          matches.forEach(match => {
+            const min = parseInt(match[1], 10);
+            const sec = parseInt(match[2], 10);
+            // ミリ秒または百分の1秒の処理
+            let ms = 0;
+            if (match[3]) {
+              ms = parseFloat("0." + match[3]);
+            }
+            const timeInSeconds = min * 60 + sec + ms;
+            
+            parsedLyrics.push({
+              time: timeInSeconds,
+              text: lyricText
+            });
+          });
+        }
+      });
+
+      // 再生時間順に並び替え
+      parsedLyrics.sort((a, b) => a.time - b.time);
+      return hasTimeTags;
+    }
+
+    // 歌詞の画面表示制御
+    function displayLyrics(text) {
+      lyricsPlaceholder.style.display = 'none';
+      lyricsText.style.display = 'flex';
+      lyricsText.innerHTML = ''; // クリア
+
+      const isLrc = parseLrc(text);
+
+      if (isLrc && parsedLyrics.length > 0) {
+        // 同期歌詞の場合：各行を別要素で生成し、不透明度を調整可能にする
+        parsedLyrics.forEach((line, index) => {
+          const p = document.createElement('p');
+          p.className = 'lyric-line';
+          p.id = `lyric-line-${index}`;
+          // 空行でも高さを保つため、空の場合は全角スペースを補う
+          p.textContent = line.text || "　";
+          lyricsText.appendChild(p);
+        });
+      } else {
+        // 非同期（普通のテキスト）歌詞の場合
+        parsedLyrics = [];
+        const lines = text.split(/\r?\n/);
+        lines.forEach(line => {
+          const p = document.createElement('p');
+          p.className = 'lyric-line active'; // 常時明るく表示
+          p.style.opacity = '1.0';
+          p.textContent = line || "　";
+          lyricsText.appendChild(p);
+        });
+      }
+      lyricsContainer.scrollTop = 0;
+    }
+
     // ID3タグ（歌詞・アルバムアート）の解析
     function readTags(file) {
       window.jsmediatags.read(file, {
@@ -685,10 +771,7 @@
           }
 
           if (lyrics && lyrics.trim() !== "") {
-            lyricsPlaceholder.style.display = 'none';
-            lyricsText.style.display = 'block';
-            lyricsText.textContent = lyrics;
-            lyricsContainer.scrollTop = 0;
+            displayLyrics(lyrics);
           } else {
             showNoLyricsInfo(tags.title, tags.artist, tags.album);
           }
@@ -741,6 +824,8 @@
       lyricsPlaceholder.style.display = 'flex';
       placeholderText.textContent = "タグ情報・歌詞を読み込み中...";
       showDefaultArt();
+      parsedLyrics = [];
+      lastActiveIndex = -1;
     }
 
     // シークバーの制御
@@ -807,19 +892,59 @@
 
     // --- オーディオプレーヤーの各種イベントリスナー ---
 
-    // 時間更新時
+    // 時間更新時（シークバー更新 ＆ 歌詞スクロール）
     audio.addEventListener('timeupdate', () => {
       if (!audio.duration) return;
-      const progress = (audio.currentTime / audio.duration) * 100;
+      
+      const curTime = audio.currentTime;
+
+      // 1. シークバーと現在時間の更新
+      const progress = (curTime / audio.duration) * 100;
       seekbar.value = progress;
-      timeCurrent.textContent = formatTime(audio.currentTime);
+      timeCurrent.textContent = formatTime(curTime);
+
+      // 2. 同期歌詞の追従スクロール処理
+      if (parsedLyrics.length > 0) {
+        let activeIndex = -1;
+
+        // 現在時間以下の最大の時間タグを持つ歌詞行を探す
+        for (let i = 0; i < parsedLyrics.length; i++) {
+          if (parsedLyrics[i].time <= curTime) {
+            activeIndex = i;
+          } else {
+            break;
+          }
+        }
+
+        // アクティブ行が切り替わった場合のみDOM操作を行う
+        if (activeIndex !== -1 && activeIndex !== lastActiveIndex) {
+          // 前のアクティブクラスを除去
+          const oldActive = document.querySelector('.lyric-line.active');
+          if (oldActive) oldActive.classList.remove('active');
+
+          // 新しい行にアクティブクラスを追加
+          const newActive = document.getElementById(`lyric-line-${activeIndex}`);
+          if (newActive) {
+            newActive.classList.add('active');
+
+            // 歌詞表示エリア中央へのスクロール位置計算
+            const containerHeight = lyricsContainer.clientHeight;
+            const lineOffsetTop = newActive.offsetTop;
+            const lineClientHeight = newActive.clientHeight;
+
+            // スクロール位置を中央に設定
+            lyricsContainer.scrollTop = lineOffsetTop - (containerHeight / 2) + (lineClientHeight / 2);
+          }
+          lastActiveIndex = activeIndex;
+        }
+      }
     });
 
     // 曲の長さ確定時
     audio.addEventListener('loadedmetadata', () => {
       timeDuration.textContent = formatTime(audio.duration);
       seekbar.value = 0;
-      audio.playbackRate = currentSpeed; // ロード時に再生速度を再適用
+      audio.playbackRate = currentSpeed;
     });
 
     // 曲再生終了時

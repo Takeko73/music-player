@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brown-player-v2';
+const CACHE_NAME = 'brown-player-v3';
 const ASSETS = [
   'index.html',
   'manifest.json',
