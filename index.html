@@ -50,7 +50,7 @@
       flex: 1;
       min-height: 0;
       overflow-y: auto;
-      padding: 40vh 24px; /* 上下に余白を作って、アクティブ行が中央に来やすくする */
+      padding: 20px 24px; /* 上下に余白を作って、アクティブ行が中央に来やすくする (変更)*/
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -918,11 +918,21 @@
           if (newActive) {
             newActive.classList.add('active');
 
-            const containerHeight = lyricsContainer.clientHeight;
-            const lineOffsetTop = newActive.offsetTop;
-            const lineClientHeight = newActive.clientHeight;
+           const containerHeight = lyricsContainer.clientHeight;
+			const lineOffsetTop = newActive.offsetTop;
+			const lineClientHeight = newActive.clientHeight;
 
-            lyricsContainer.scrollTop = lineOffsetTop - (containerHeight / 2) + (lineClientHeight / 2);
+			const lineCenter =
+  				lineOffsetTop + (lineClientHeight / 2);
+
+			const containerCenter =
+  				lyricsContainer.scrollTop + (containerHeight / 2);
+
+	// 現在の歌詞が中央より下に来たらスクロール
+			if (lineCenter > containerCenter) {
+  				lyricsContainer.scrollTop =
+   					 lineOffsetTop - (containerHeight / 2) + (lineClientHeight / 2);
+				}
           }
           lastActiveIndex = activeIndex;
         }
