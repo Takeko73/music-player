@@ -468,27 +468,12 @@
         </select>
       </div>
 
-      <!-- 再生速度選択 -->
-      <div class="speed-select-wrapper">
-        <select id="speed-select" onchange="changeSpeed(this.value)" aria-label="再生速度">
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="0.9">0.9x</option>
-          <option value="1.0" selected>1.0x</option>
-          <option value="1.1">1.1x</option>
-          <option value="1.2">1.2x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-          <option value="1.75">1.75x</option>
-          <option value="2.0">2.0x</option>
-        </select>
-      </div>
-
-      <!-- 音量スライダー（音量0で停止） -->
-      <div class="volume-container">
-        <span id="volume-btn" class="volume-icon" onclick="toggleMute()">🔊</span>
-        <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="changeVolume(this.value)">
-      </div>
+   <!-- 再生速度コントロール -->
+<div class="speed-control">
+  <button class="speed-btn" onclick="changeSpeed(-0.01)" aria-label="再生速度を下げる">−</button>
+  <button id="speed-display" class="speed-display" onclick="resetSpeed()" aria-label="再生速度を1.00倍に戻す">1.00×</button>
+  <button class="speed-btn" onclick="changeSpeed(0.01)" aria-label="再生速度を上げる">＋</button>
+</div>
     </div>
 
   </div>
