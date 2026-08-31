@@ -553,8 +553,7 @@
     const placeholderText = document.getElementById('placeholder-text');
     const lyricsText = document.getElementById('lyrics-text');
     const folderSelect = document.getElementById('folder-select');
-    const volumeSlider = document.getElementById('volume-slider');
-    const volumeBtn = document.getElementById('volume-btn');
+    
 
     // サービスワーカー登録
     if ('serviceWorker' in navigator) {
@@ -996,15 +995,12 @@
     });
 
     // 音量変更時
-    audio.addEventListener('volumechange', () => {
-      volumeSlider.value = audio.volume * 100;
-      updateVolumeIcon(audio.volume);
-
-      if (audio.volume === 0 || audio.muted) {
-        audio.pause();
-        updatePlayButton(false);
-      }
-    });
+   audio.addEventListener('volumechange', () => {
+  	if (audio.volume === 0 || audio.muted) {
+    	audio.pause();
+   	 updatePlayButton(false);
+ 	 }
+	});
 
     // キーボード操作対応
     document.addEventListener('keydown', (e) => {
