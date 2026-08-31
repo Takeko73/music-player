@@ -553,7 +553,6 @@
     const placeholderText = document.getElementById('placeholder-text');
     const lyricsText = document.getElementById('lyrics-text');
     const folderSelect = document.getElementById('folder-select');
-    const speedSelect = document.getElementById('speed-select');
     const volumeSlider = document.getElementById('volume-slider');
     const volumeBtn = document.getElementById('volume-btn');
 
@@ -861,10 +860,26 @@
     }
 
     // 再生速度制御
-    function changeSpeed(value) {
-      currentSpeed = parseFloat(value);
-      audio.playbackRate = currentSpeed;
-    }
+	function changeSpeed(delta) {
+ 	 currentSpeed = Math.round((currentSpeed + delta) * 100) / 100;
+
+ 	 if (currentSpeed < 0.5) currentSpeed = 0.5;
+ 	 if (currentSpeed > 2.0) currentSpeed = 2.0;
+
+ 	 audio.playbackRate = currentSpeed;
+ 	 updateSpeedDisplay();
+	}
+
+	function resetSpeed() {
+  	currentSpeed = 1.0;
+  	audio.playbackRate = currentSpeed;
+ 	 updateSpeedDisplay();
+	}
+
+	function updateSpeedDisplay() {
+	  document.getElementById('speed-display').textContent =
+	    currentSpeed.toFixed(2) + '×';
+	}
 
     // 音量制御
     function changeVolume(value) {
