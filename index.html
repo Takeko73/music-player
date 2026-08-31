@@ -668,18 +668,17 @@
         }
         return;
       }
+	if (audio.paused) {
+	  if (audio.volume === 0 || audio.muted) {
+	    return;
+	  }
 
-      if (audio.paused) {
-        if (audio.volume === 0) {
-          audio.volume = 0.1;
-          volumeSlider.value = 10;
-          updateVolumeIcon(0.1);
-        }
-        audio.play().then(() => {
-          updatePlayButton(true);
-          audio.playbackRate = currentSpeed; // 再生速度を再適用
-        }).catch(err => console.error(err));
-      } else {
+	  audio.play().then(() => {
+	    updatePlayButton(true);
+	    audio.playbackRate = currentSpeed;
+	  }).catch(err => console.error(err));
+	}
+ else {
         audio.pause();
         updatePlayButton(false);
       }
