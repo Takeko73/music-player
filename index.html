@@ -47,10 +47,12 @@
 
     /* 歌詞表示エリア（画面上部） */
     #lyrics-container {
+      position: relative;
       flex: 1;
       min-height: 0;
+      height: 0;
       overflow-y: auto;
-      padding: 20px 24px; /* 上下に余白を作って、アクティブ行が中央に来やすくする (変更)*/
+	  padding: 60px 24px 20px; /* 上下に余白を作って、アクティブ行が中央に来やすくする (変更)*/
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -83,6 +85,8 @@
 
     #lyrics-text {
       width: 100%;
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -441,6 +445,35 @@
       border: 1px dashed var(--accent);
       margin-top: 15px;
     }
+    
+	#media-toggle-button {
+	  position: absolute;
+	  top: 16px;
+	  right: 16px;
+	  z-index: 2;
+
+	  background: var(--bg-panel);
+	  border: 1px solid var(--accent);
+	  color: var(--text-main);
+	  padding: 8px 12px;
+	  border-radius: 8px;
+	  font-size: 0.8rem;
+	}
+
+	#large-album-art {
+	  width: 100%;
+	  height: 100%;
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	}
+
+	#large-album-art-image {
+	  max-width: 90%;
+	  max-height: 90%;
+	  object-fit: contain;
+	  border-radius: 12px;
+	}
   </style>
 </head>
 <body>
@@ -467,11 +500,17 @@
   <!-- メインプレイヤー画面 -->
   <!-- 画面上部：歌詞表示エリア -->
   <div id="lyrics-container">
+    <button id="media-toggle-button" onclick="toggleMediaDisplay()">
+    🖼️ アルバムアートを表示
+  	</button>
     <div id="lyrics-placeholder">
       <span class="music-icon">🎵</span>
       <span id="placeholder-text">再生ボタンを押してください</span>
     </div>
     <div id="lyrics-text" style="display: none;"></div>
+      <div id="large-album-art" style="display: none;">
+    	<img id="large-album-art-image" src="" alt="Album Art">
+  </div>
   </div>
 
   <!-- 画面下部：コントロールパネル -->
@@ -538,6 +577,8 @@
     let currentSpeed = 1.0;   // 再生速度保持用
     let parsedLyrics = [];    // 解析済み同期歌詞の配列: [{ time: 秒数, text: 行テキスト }]
     let lastActiveIndex = -1; // 前回アクティブだった歌詞のインデックス
+    let mediaDisplayMode = "lyrics";
+	let hasLyrics = false;
 
     const audio = document.getElementById('audio-player');
     const playBtn = document.getElementById('play-btn');
@@ -553,6 +594,9 @@
     const placeholderText = document.getElementById('placeholder-text');
     const lyricsText = document.getElementById('lyrics-text');
     const folderSelect = document.getElementById('folder-select');
+    const mediaToggleButton = document.getElementById('media-toggle-button');
+	const largeAlbumArt = document.getElementById('large-album-art');
+	const largeAlbumArtImage = document.getElementById('large-album-art-image');
     
 
     // サービスワーカー登録
@@ -756,6 +800,9 @@
           p.className = 'lyric-line';
           p.id = `lyric-line-${index}`;
           p.textContent = line.text || "　";
+          p.onclick = () => {
+ 			 audio.currentTime = line.time;
+			};
           lyricsText.appendChild(p);
         });
       } else {
@@ -771,6 +818,20 @@
       }
       lyricsContainer.scrollTop = 0;
     }
+    //歌詞とアルバムアートの切り替え
+    function toggleMediaDisplay() {
+	  if (mediaDisplayMode === "lyrics") {
+	    mediaDisplayMode = "art";
+	    lyricsText.style.display = 'none';
+	    largeAlbumArt.style.display = 'flex';
+	    mediaToggleButton.textContent = '🎤 歌詞を表示';
+	  } else {
+	    mediaDisplayMode = "lyrics";
+	    lyricsText.style.display = 'flex';
+	    largeAlbumArt.style.display = 'none';
+	    mediaToggleButton.textContent = '🖼️ アルバムアートを表示';
+	  }
+	}
 
     // ID3タグ（歌詞・アルバムアート）の解析
     function readTags(file) {
@@ -791,12 +852,22 @@
               lyrics = commText;
             }
           }
+		//「歌詞ありなら歌詞モード」「歌詞なしならアートモード」
+		if (lyrics && lyrics.trim() !== "") {
+		  hasLyrics = true;
+		  mediaDisplayMode = "lyrics";
+		  displayLyrics(lyrics);
 
-          if (lyrics && lyrics.trim() !== "") {
-            displayLyrics(lyrics);
-          } else {
-            showNoLyricsInfo(tags.title, tags.artist, tags.album);
-          }
+		  mediaToggleButton.style.display = 'block';
+		  mediaToggleButton.textContent = '🖼️ アルバムアートを表示';
+
+		} else {
+		  hasLyrics = false;
+		  mediaDisplayMode = "art";
+		  showNoLyricsInfo(tags.title, tags.artist, tags.album);
+
+		  mediaToggleButton.style.display = 'none';
+		}
 
           // 2. カバーアート（アルバムアート）の表示
           if (tags.picture) {
@@ -808,6 +879,7 @@
             albumArt.src = artUrl;
             albumArt.style.display = 'block';
             defaultArt.style.display = 'none';
+            largeAlbumArtImage.src = artUrl;
           } else {
             showDefaultArt();
           }
@@ -848,6 +920,9 @@
       showDefaultArt();
       parsedLyrics = [];
       lastActiveIndex = -1;
+      mediaDisplayMode = "lyrics";
+	  largeAlbumArt.style.display = 'none';
+	  mediaToggleButton.style.display = 'none';
     }
 
     // シークバーの制御
