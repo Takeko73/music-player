@@ -114,7 +114,7 @@
       border-top-left-radius: 28px;
       border-top-right-radius: 28px;
       /* 下部のナビゲーションバー（ホームインジケーター）との重なりを防ぐために余白を拡張 */
-      padding: 20px 20px calc(32px + var(--safe-bottom)) 20px;
+      padding: 20px 20px calc(20px + var(--safe-bottom)) 20px;
       box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
       display: flex;
       flex-direction: column;
@@ -498,20 +498,27 @@
   </div>
 
   <!-- メインプレイヤー画面 -->
-  <!-- 画面上部：歌詞表示エリア -->
-  <div id="lyrics-container">
-    <button id="media-toggle-button" onclick="toggleMediaDisplay()">
-    🖼️ アルバムアートを表示
-  	</button>
-    <div id="lyrics-placeholder">
-      <span class="music-icon">🎵</span>
-      <span id="placeholder-text">再生ボタンを押してください</span>
-    </div>
-    <div id="lyrics-text" style="display: none;"></div>
-      <div id="large-album-art" style="display: none;">
-    	<img id="large-album-art-image" src="" alt="Album Art">
-  </div>
-  </div>
+
+	<!-- アルバムアート切り替えボタン -->
+	<button id="media-toggle-button" onclick="toggleMediaDisplay()">
+	  🖼️ アルバムアートを表示
+	</button>
+
+	<!-- 画面上部：歌詞表示エリア -->
+	<div id="lyrics-container">
+
+	  <div id="lyrics-placeholder">
+	    <span class="music-icon">🎵</span>
+	    <span id="placeholder-text">再生ボタンを押してください</span>
+	  </div>
+
+	  <div id="lyrics-text" style="display: none;"></div>
+
+	  <div id="large-album-art" style="display: none;">
+	    <img id="large-album-art-image" src="" alt="Album Art">
+	  </div>
+
+	</div>
 
   <!-- 画面下部：コントロールパネル -->
   <div id="control-panel">
