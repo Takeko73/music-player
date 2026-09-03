@@ -155,8 +155,8 @@
     }
 
     #album-art-container {
-      width: 80px;
-      height: 80px;
+      width: 56px;
+      height: 56px;
       background-color: var(--bg-dark);
       border-radius: 12px;
       overflow: hidden;
@@ -203,10 +203,10 @@
     }
 
     .btn-play-pause {
-      width: 64px;
-      height: 64px;
+      width: 56px;
+      height: 56px;
       background-color: var(--accent);
-      font-size: 28px;
+      font-size: 26px;
       box-shadow: 0 4px 12px rgba(141, 110, 99, 0.4);
     }
 
@@ -552,6 +552,7 @@
 
     <!-- サブコントロール（フォルダ選択、再生速度、音量） -->
     <div id="sub-controls">
+
       <!-- フォルダ選択セレクトボックス -->
       <div class="folder-select-wrapper">
         <select id="folder-select" onchange="switchFolder(this.value)" aria-label="フォルダ選択">
@@ -586,6 +587,8 @@
     let lastActiveIndex = -1; // 前回アクティブだった歌詞のインデックス
     let mediaDisplayMode = "lyrics";
 	let hasLyrics = false;
+	// 前回の再生状態
+	let lastPlayedState = JSON.parse(localStorage.getItem('brownPlayerState') || 'null');		
 
     const audio = document.getElementById('audio-player');
     const playBtn = document.getElementById('play-btn');
@@ -655,7 +658,14 @@
       });
 
       // 初期フォルダを設定
-      currentFolderName = sortedFolderNames[0];
+	if (
+		lastPlayedState &&
+		folders[lastPlayedState.folderName]
+	) {
+		currentFolderName = lastPlayedState.folderName;
+	} else {
+		currentFolderName = sortedFolderNames[0];
+	}
       folderSelect.value = currentFolderName;
       currentPlaylist = folders[currentFolderName];
       
@@ -665,10 +675,40 @@
       // セットアップ画面を非表示にする
       document.getElementById('setup-screen').style.display = 'none';
 
-      // 最初の曲を選択状態にする
-      selectTrack(0, false);
-      placeholderText.textContent = "曲を選択して再生してください";
-    }
+	// 前回の再生状態を復元
+	let restoreIndex = 0;
+	let restoreTime = 0;
+
+	if (
+	  lastPlayedState &&
+	  lastPlayedState.folderName === currentFolderName
+	) {
+	  const savedIndex = currentPlaylist.findIndex(
+	    file => file.name === lastPlayedState.fileName
+	  );
+
+	  if (savedIndex !== -1) {
+	    restoreIndex = savedIndex;
+	    restoreTime = lastPlayedState.currentTime || 0;
+	  }
+	}
+
+	selectTrack(restoreIndex, false);
+
+	// 再生位置を復元
+	if (restoreTime > 0) {
+	  audio.addEventListener('loadedmetadata', function restorePosition() {
+	    audio.currentTime = Math.min(
+	      restoreTime,
+	      Math.max(0, audio.duration - 1)
+	    );
+
+	    audio.removeEventListener('loadedmetadata', restorePosition);
+	  });
+	}
+
+	placeholderText.textContent = "曲を選択して再生してください";
+	    }
 
     // フォルダの切り替え
     function switchFolder(folderName) {
@@ -681,9 +721,15 @@
 
     // 曲の選択
     function selectTrack(index, autoPlay = true) {
-      if (index < 0 || index >= currentPlaylist.length) return;
-      currentIndex = index;
-      const file = currentPlaylist[currentIndex];
+	  if (index < 0 || index >= currentPlaylist.length) return;
+
+	  // 現在の曲の再生状態を保存
+	  if (currentIndex !== -1 && currentPlaylist[currentIndex]) {
+	    savePlaybackState();
+	  }
+
+	  currentIndex = index;
+	  const file = currentPlaylist[currentIndex];
 
       // 曲情報更新
       trackTitle.textContent = file.name.replace(/\.[^/.]+$/, ""); // 拡張子削除
@@ -1003,6 +1049,20 @@
       }
     }
 
+	// 現在の再生状態を保存
+	function savePlaybackState() {
+	  if (currentIndex === -1 || !currentPlaylist[currentIndex]) return;
+
+	  const state = {
+	    folderName: currentFolderName,
+	    fileName: currentPlaylist[currentIndex].name,
+	    currentTime: audio.currentTime,
+	    playbackRate: currentSpeed
+	  };
+
+	  localStorage.setItem('brownPlayerState', JSON.stringify(state));
+	}
+
     function formatTime(seconds) {
       if (isNaN(seconds)) return "0:00";
       const mins = Math.floor(seconds / 60);
@@ -1017,6 +1077,9 @@
       if (!audio.duration) return;
       
       const curTime = audio.currentTime;
+      
+        // 現在の再生状態を保存
+ 	 savePlaybackState();
 
       // 1. シークバーと時間表示の更新
       const progress = (curTime / audio.duration) * 100;
@@ -1074,6 +1137,9 @@
     // 曲再生終了時
     audio.addEventListener('ended', () => {
       playNext();
+      
+        // 次の曲を0秒地点として保存
+  	savePlaybackState();
     });
 
     // 音量変更時
